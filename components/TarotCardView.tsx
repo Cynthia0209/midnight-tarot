@@ -73,15 +73,17 @@ export function TarotCardView({
                 <span className="mt-3 font-zhSerif text-sm tracking-[.12em] text-moon/85">{card.nameZh}</span>
                 <span className="mt-1 font-display text-[8px] uppercase tracking-[.12em] text-antiqueGold/55">{card.name}</span>
               </span>
-              <Image
-                src={card.imagePath}
-                alt={`${card.nameZh} ${card.name}`}
-                fill
-                sizes="(max-width: 640px) 112px, 142px"
-                className="card-image object-cover"
-                priority={selected}
-                onError={(event) => { event.currentTarget.style.display = "none"; }}
-              />
+              {revealed && (
+                <Image
+                  src={card.imagePath}
+                  alt={`${card.nameZh} ${card.name}`}
+                  fill
+                  sizes="(max-width: 640px) 112px, 142px"
+                  className="card-image object-cover"
+                  priority={selected}
+                  onError={(event) => { event.currentTarget.style.display = "none"; }}
+                />
+              )}
               <span className="absolute inset-0 bg-[linear-gradient(180deg,rgba(24,10,35,.10),transparent_48%,rgba(15,7,24,.30))] mix-blend-multiply" />
               <span className="absolute inset-[5px] rounded-[8px] border border-[#3a203f]/40" />
             </>
