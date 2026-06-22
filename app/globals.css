@@ -5,7 +5,7 @@
 :root { color-scheme: dark; }
 * { box-sizing: border-box; }
 html { background: #07050b; scroll-behavior: smooth; }
-body { margin: 0; min-height: 100%; overflow-x: hidden; background: #07050b; color: #f1edf6; }
+body { margin: 0; min-height: 100%; overflow-x: clip; background: #07050b; color: #f1edf6; }
 button, textarea, input { font: inherit; }
 button { -webkit-tap-highlight-color: transparent; }
 ::selection { background: rgba(216, 191, 136, .28); }
@@ -63,13 +63,21 @@ button { -webkit-tap-highlight-color: transparent; }
   position:absolute;
   transform:translate(-50%,-50%) rotate(var(--slot-r));
 }
-.spread-slot-label { transition:opacity .35s ease; }
 .fan-scroll { scrollbar-width:none; touch-action:pan-x; }
 .fan-scroll::-webkit-scrollbar { display:none; }
-.fan-card { transform:translateX(-50%) rotate(0deg); transform-origin:50% 130%; }
+.fan-card {
+  transform:translateX(-50%) rotate(var(--fan-angle));
+  transform-origin:50% 155%;
+}
 .reading-text p { margin:0 0 1.15em; }
+.reading-story-section { padding:3.5rem 0; }
+.reading-card-list { scrollbar-width:thin; scrollbar-color:rgba(216,191,136,.2) transparent; }
+.reading-card-list::-webkit-scrollbar { width:4px; }
+.reading-card-list::-webkit-scrollbar-track { background:transparent; }
+.reading-card-list::-webkit-scrollbar-thumb { border-radius:999px; background:rgba(216,191,136,.2); }
 
 @media (min-width:768px) {
+  .fan-deck-track { min-width:0 !important; }
   .fan-card {
     left:var(--fan-left-desktop) !important;
     top:var(--fan-top-desktop) !important;

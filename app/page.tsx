@@ -14,16 +14,18 @@ import { SpreadGallery } from "@/components/SpreadGallery";
 import { tarotCards } from "@/data/tarotCards";
 import { spreadById, tarotSpreads, type TarotSpread } from "@/data/spreads";
 import {
-  buildFallbackReading,
+  buildStructuredFallbackReading,
   createSession,
+  isStructuredReading,
   loadReadings,
   saveReading,
   type DeckCard,
+  type ReadingContent,
   type ReadingSession,
   type ReadingStage,
   type SavedReading,
 } from "@/lib/reading";
-import { getMuted, playRitualSound, setMuted as persistMuted } from "@/lib/sound";
+import { getMuted, playRitualSound, setMuted as persistMuted, unlockRitualSound } from "@/lib/sound";
 
 gsap.registerPlugin(Flip);
 
@@ -40,7 +42,7 @@ export default function Home() {
   const [question, setQuestion] = useState("");
   const [session, setSession] = useState<ReadingSession | null>(null);
   const [revealCount, setRevealCount] = useState(0);
-  const [reading, setReading] = useState("");
+  const [reading, setReading] = useState<ReadingContent | null>(null);
   const [readingLoading, setReadingLoading] = useState(false);
   const [readingError, setReadingError] = useState<string>();
   const [savedReading, setSavedReading] = useState<SavedReading>();
@@ -102,10 +104,11 @@ export default function Home() {
   };
 
   const beginRitual = (ritualQuestion = question) => {
+    if (!muted) void unlockRitualSound();
     const next = createSession(spread.id, ritualQuestion, tarotCards.map((card) => card.id));
     setSession(next);
     setRevealCount(0);
-    setReading("");
+    setReading(null);
     setReadingError(undefined);
     setSavedReading(undefined);
     setStage("shuffle");
@@ -137,19 +140,20 @@ export default function Home() {
   async function generateReading(activeSession: ReadingSession) {
     setReadingLoading(true);
     setReadingError(undefined);
-    setReading("");
 
-    const fallback = buildFallbackReading(
+    const fallback = buildStructuredFallbackReading(
       activeSession.question,
       activeSession.selected.map((item, index) => {
         const card = tarotCards.find((candidate) => candidate.id === item.cardId)!;
         return {
+          positionId: spread.positions[index].id,
+          positionTitle: spread.positions[index].titleZh,
           nameZh: `${card.nameZh}${item.orientation === "reversed" ? "（逆位）" : ""}`,
-          position: spread.positions[index].titleZh,
           meaning: item.orientation === "reversed" ? card.reversedMeaning : card.uprightMeaning,
         };
       })
     );
+    setReading(fallback);
 
     try {
       const response = await fetch("/api/reading", {
@@ -162,20 +166,11 @@ export default function Home() {
         }),
       });
       if (!response.ok) throw new Error("Reading request failed");
-      if (!response.body) throw new Error("Streaming unavailable");
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let fullText = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        fullText += decoder.decode(value, { stream: true });
-        setReading(fullText);
-      }
-      if (!fullText.trim()) fullText = fallback;
-      setReading(fullText);
-      completeReading(activeSession, fullText);
+      const data = await response.json() as { reading?: unknown; fallback?: boolean };
+      const nextReading = isStructuredReading(data.reading) ? data.reading : fallback;
+      setReading(nextReading);
+      if (data.fallback) setReadingError("今晚的连接有些微弱，先为你保留了基于牌面的本地解读。你可以稍后重新连接。");
+      completeReading(activeSession, nextReading);
     } catch {
       setReading(fallback);
       setReadingError("今晚的连接有些微弱，先为你保留了基于牌面的本地解读。你可以稍后重新连接。");
@@ -185,13 +180,13 @@ export default function Home() {
     }
   }
 
-  function completeReading(activeSession: ReadingSession, text: string) {
+  function completeReading(activeSession: ReadingSession, content: ReadingContent) {
     const saved: SavedReading = {
       id: activeSession.id,
       spreadId: activeSession.spreadId,
       question: activeSession.question,
       cards: activeSession.selected,
-      reading: text,
+      reading: content,
       createdAt: activeSession.createdAt,
     };
     setSavedReading(saved);
@@ -201,7 +196,7 @@ export default function Home() {
   const restart = () => {
     setSession(null);
     setQuestion("");
-    setReading("");
+    setReading(null);
     setSavedReading(undefined);
     setRevealCount(0);
     setStage("spread");
@@ -211,10 +206,13 @@ export default function Home() {
     const next = !muted;
     setMuted(next);
     persistMuted(next);
+    if (!next) {
+      void unlockRitualSound().then(() => playRitualSound("draw", false));
+    }
   };
 
   return (
-    <main className="relative min-h-screen overflow-hidden text-moon">
+    <main className="relative min-h-screen overflow-x-clip text-moon">
       <Background />
 
       <header className="relative z-50 flex h-20 items-center justify-between px-5 md:px-9">
@@ -222,7 +220,15 @@ export default function Home() {
         <div className="flex items-center gap-2">
           {stage !== "intro" && <span className="mr-2 hidden text-[10px] tracking-[.22em] text-moon/30 sm:inline">{stageLabel}</span>}
           <button type="button" onClick={() => setHistoryOpen(true)} className="rounded-full border border-white/[.08] bg-white/[.025] px-4 py-2 text-[11px] text-moon/55 transition hover:border-antiqueGold/30">历史 {history.length || ""}</button>
-          <button type="button" onClick={toggleMuted} aria-label={muted ? "开启声音" : "静音"} className="grid h-9 w-9 place-items-center rounded-full border border-white/[.08] bg-white/[.025] text-sm text-antiqueGold/65">{muted ? "♩" : "♪"}</button>
+          <button
+            type="button"
+            onClick={toggleMuted}
+            aria-label={muted ? "开启声音" : "静音"}
+            title={muted ? "声音已关闭，点击开启" : "声音已开启，点击静音"}
+            className={`grid h-9 w-9 place-items-center rounded-full border bg-white/[.025] text-sm transition ${muted ? "border-white/[.08] text-moon/30" : "border-antiqueGold/25 text-antiqueGold/75"}`}
+          >
+            {muted ? "♩" : "♪"}
+          </button>
         </div>
       </header>
 
@@ -303,7 +309,7 @@ export default function Home() {
                 {stage === "draw" ? "第一眼吸引你的，往往不是偶然" : "秘密正在一张一张打开"}
               </h1>
               <p className="mt-3 text-xs tracking-[.18em] text-moon/35">
-                {stage === "draw" ? `已选择 ${selectedCount} / ${neededCount}` : `正在揭示 ${Math.min(revealCount + 1, neededCount)} / ${neededCount}`}
+                {stage === "draw" ? `完整 78 张牌 · 已选择 ${selectedCount} / ${neededCount}` : `正在揭示 ${Math.min(revealCount + 1, neededCount)} / ${neededCount}`}
               </p>
               {stage === "draw" && <FanDeck deck={session.deck} selected={session.selected} locked={selectedCount >= neededCount} onSelect={selectCard} />}
               <div className={stage === "draw" ? "-mt-8 md:-mt-20" : "mt-8"}>
@@ -313,26 +319,21 @@ export default function Home() {
           )}
 
           {stage === "reading" && session && (
-            <motion.section key="reading" {...pageMotion} className="mx-auto max-w-[1180px] py-7">
+            <motion.section key="reading" {...pageMotion} className="mx-auto max-w-[1320px] py-7">
               <div className="mb-8 text-center">
                 <p className="font-display text-[10px] uppercase tracking-[.46em] text-antiqueGold/65">Your reflection</p>
                 <h1 className="mt-3 font-zhSerif text-3xl tracking-[.12em] md:text-5xl">牌已经回应</h1>
               </div>
-              <div className="grid items-start gap-8 lg:grid-cols-[.9fr_1.1fr]">
-                <div className="ritual-panel rounded-[28px] p-4">
-                  <SpreadBoard spread={spread} selected={session.selected} revealCount={neededCount} showMeanings />
-                </div>
-                <ReadingPanel
-                  spread={spread}
-                  question={session.question}
-                  cards={session.selected}
-                  text={reading}
-                  loading={readingLoading}
-                  error={readingError}
-                  savedReading={savedReading}
-                  onRetry={() => void generateReading(session)}
-                />
-              </div>
+              <ReadingPanel
+                spread={spread}
+                cards={session.selected}
+                question={session.question}
+                reading={reading}
+                loading={readingLoading}
+                error={readingError}
+                savedReading={savedReading}
+                onRetry={() => void generateReading(session)}
+              />
               <div className="mt-9 text-center"><button type="button" onClick={restart} className="text-xs tracking-[.2em] text-moon/35 hover:text-antiqueGold">开始一次新的占卜</button></div>
             </motion.section>
           )}

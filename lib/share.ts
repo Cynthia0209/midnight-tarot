@@ -1,6 +1,7 @@
 "use client";
 
 import type { SavedReading } from "@/lib/reading";
+import { readingToPlainText } from "@/lib/reading";
 import { spreadById } from "@/data/spreads";
 import { tarotCardById } from "@/data/tarotCards";
 
@@ -72,7 +73,7 @@ export async function createShareImage(reading: SavedReading): Promise<File> {
   context.textAlign = "left";
   context.fillStyle = "rgba(245,239,231,.88)";
   context.font = "30px serif";
-  const readingLines = wrapText(context, reading.reading.replace(/\n+/g, " "), 820).slice(0, 12);
+  const readingLines = wrapText(context, readingToPlainText(reading.reading).replace(/\n+/g, " "), 820).slice(0, 12);
   readingLines.forEach((line, index) => context.fillText(line, 130, 740 + index * 45));
   context.textAlign = "center";
   context.fillStyle = "rgba(216,191,136,.7)";
