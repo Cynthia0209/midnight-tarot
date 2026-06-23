@@ -155,7 +155,7 @@ export default function Home() {
         };
       })
     );
-    setReading(fallback);
+    setReading(null);
 
     try {
       const response = await fetch("/api/reading", {
