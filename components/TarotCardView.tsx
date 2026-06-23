@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { forwardRef } from "react";
 import type { CSSProperties, MouseEvent } from "react";
 import type { CardOrientation, TarotCard } from "@/data/tarotCards";
 import { cx } from "@/lib/utils";
@@ -19,7 +20,7 @@ type Props = {
   tabIndex?: number;
 };
 
-export function TarotCardView({
+export const TarotCardView = forwardRef<HTMLButtonElement, Props>(function TarotCardView({
   card,
   revealed = false,
   orientation = "upright",
@@ -31,9 +32,10 @@ export function TarotCardView({
   style,
   flipId,
   tabIndex,
-}: Props) {
+}, ref) {
   return (
     <button
+      ref={ref}
       type="button"
       aria-label={revealed && card ? `${card.nameZh} ${orientation === "reversed" ? "逆位" : "正位"}` : "未揭示的塔罗牌"}
       aria-pressed={selected}
@@ -92,4 +94,4 @@ export function TarotCardView({
       </span>
     </button>
   );
-}
+});

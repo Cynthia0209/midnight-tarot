@@ -40,6 +40,7 @@ export default function Home() {
   const [stage, setStage] = useState<ReadingStage>("intro");
   const [spread, setSpread] = useState<TarotSpread>(tarotSpreads[1]);
   const [question, setQuestion] = useState("");
+  const [context, setContext] = useState("");
   const [session, setSession] = useState<ReadingSession | null>(null);
   const [revealCount, setRevealCount] = useState(0);
   const [reading, setReading] = useState<ReadingContent | null>(null);
@@ -103,9 +104,9 @@ export default function Home() {
     setStage("intention");
   };
 
-  const beginRitual = (ritualQuestion = question) => {
+  const beginRitual = (ritualQuestion = question, ritualContext = context) => {
     if (!muted) void unlockRitualSound();
-    const next = createSession(spread.id, ritualQuestion, tarotCards.map((card) => card.id));
+    const next = createSession(spread.id, ritualQuestion, tarotCards.map((card) => card.id), ritualContext);
     setSession(next);
     setRevealCount(0);
     setReading(null);
@@ -143,6 +144,7 @@ export default function Home() {
 
     const fallback = buildStructuredFallbackReading(
       activeSession.question,
+      activeSession.context ?? "",
       activeSession.selected.map((item, index) => {
         const card = tarotCards.find((candidate) => candidate.id === item.cardId)!;
         return {
@@ -162,6 +164,7 @@ export default function Home() {
         body: JSON.stringify({
           spreadId: activeSession.spreadId,
           question: activeSession.question,
+          context: activeSession.context,
           cards: activeSession.selected.map(({ positionId, cardId, orientation }) => ({ positionId, cardId, orientation })),
         }),
       });
@@ -185,6 +188,7 @@ export default function Home() {
       id: activeSession.id,
       spreadId: activeSession.spreadId,
       question: activeSession.question,
+      context: activeSession.context,
       cards: activeSession.selected,
       reading: content,
       createdAt: activeSession.createdAt,
@@ -196,6 +200,7 @@ export default function Home() {
   const restart = () => {
     setSession(null);
     setQuestion("");
+    setContext("");
     setReading(null);
     setSavedReading(undefined);
     setRevealCount(0);
@@ -274,9 +279,17 @@ export default function Home() {
                   className="min-h-36 w-full resize-none rounded-[20px] bg-black/10 px-6 py-7 text-center font-zhSerif text-lg leading-8 tracking-[.08em] text-moon outline-none placeholder:text-moon/25 focus:bg-white/[.015]"
                 />
                 <div className="flex items-center justify-between px-4 pb-3 text-[10px] text-moon/25"><span>问题不会被保存，直到解读完成</span><span>{question.length}/240</span></div>
+                <div className="mx-3 border-t border-antiqueGold/10" />
+                <textarea
+                  value={context}
+                  onChange={(event) => setContext(event.target.value.slice(0, 500))}
+                  placeholder="可选：补充发生了什么、涉及谁，以及你最纠结的部分…"
+                  className="min-h-28 w-full resize-none rounded-[20px] bg-black/10 px-6 py-5 text-left font-zhSerif text-sm leading-7 tracking-[.06em] text-moon outline-none placeholder:text-moon/25 focus:bg-white/[.015]"
+                />
+                <div className="flex items-center justify-between px-4 pb-3 text-[10px] text-moon/25"><span>背景只保存在你的浏览器，不会出现在分享图中</span><span>{context.length}/500</span></div>
               </div>
               <button type="button" onClick={() => beginRitual()} className="gold-button mt-8 rounded-full px-10 py-4 font-zhSerif tracking-[.2em]">开始洗牌</button>
-              <button type="button" onClick={() => { setQuestion(""); beginRitual(""); }} className="mt-5 text-xs tracking-[.14em] text-moon/30 hover:text-moon/60">什么都不写，直接开始</button>
+              <button type="button" onClick={() => { setQuestion(""); setContext(""); beginRitual("", ""); }} className="mt-5 text-xs tracking-[.14em] text-moon/30 hover:text-moon/60">什么都不写，直接开始</button>
             </motion.section>
           )}
 
@@ -328,6 +341,7 @@ export default function Home() {
                 spread={spread}
                 cards={session.selected}
                 question={session.question}
+                context={session.context}
                 reading={reading}
                 loading={readingLoading}
                 error={readingError}
@@ -362,6 +376,7 @@ export default function Home() {
                         id: item.id,
                         spreadId: item.spreadId,
                         question: item.question,
+                        context: item.context,
                         stage: "reading",
                         deck: [],
                         selected: item.cards,

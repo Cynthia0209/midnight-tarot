@@ -10,7 +10,7 @@ import type {
   SelectedReadingCard,
   StructuredReading,
 } from "@/lib/reading";
-import { isStructuredReading } from "@/lib/reading";
+import { isStructuredReading, isStructuredReadingV3 } from "@/lib/reading";
 import { shareReading } from "@/lib/share";
 import { SpreadBoard } from "@/components/SpreadBoard";
 import { TarotCardView } from "@/components/TarotCardView";
@@ -28,6 +28,7 @@ type Props = {
   spread: TarotSpread;
   cards: SelectedReadingCard[];
   question: string;
+  context?: string;
   reading: ReadingContent | null;
   loading: boolean;
   error?: string;
@@ -79,6 +80,7 @@ function LegacyReading({
   spread,
   cards,
   question,
+  context,
   text,
   error,
   savedReading,
@@ -95,6 +97,7 @@ function LegacyReading({
           <p className="font-display text-[10px] uppercase tracking-[.4em] text-antiqueGold/60">Archived reading</p>
           <h2 className="mt-3 font-zhSerif text-3xl tracking-[.08em] text-moon">过去保存的解读</h2>
           {question && <p className="mt-8 border-l border-antiqueGold/35 pl-4 font-zhSerif text-sm leading-7 text-moon/55">你问：{question}</p>}
+          {context && <p className="mt-4 border-l border-antiqueGold/15 pl-4 text-xs leading-6 text-moon/38">补充背景：{context}</p>}
           <div className="reading-text mt-9 font-zhSerif text-[17px] leading-9 tracking-[.035em] text-moon/82 md:text-[18px]">
             {paragraphs.map((paragraph, index) => <p key={index}>{renderInlineMarkdown(paragraph)}</p>)}
           </div>
@@ -109,6 +112,7 @@ export function ReadingPanel({
   spread,
   cards,
   question,
+  context,
   reading,
   loading,
   error,
@@ -143,6 +147,7 @@ export function ReadingPanel({
         spread={spread}
         cards={cards}
         question={question}
+        context={context}
         text={reading}
         error={error}
         savedReading={savedReading}
@@ -184,6 +189,27 @@ export function ReadingPanel({
               <p className="font-display text-[10px] uppercase tracking-[.36em] text-antiqueGold/55">Your question</p>
               <p className="mt-4 font-zhSerif text-xl leading-9 tracking-[.06em] text-moon/70">{question}</p>
             </div>
+          )}
+          {context && (
+            <details className="-mt-7 mb-10 border-b border-antiqueGold/10 pb-7 text-moon/40">
+              <summary className="cursor-pointer text-[10px] uppercase tracking-[.22em] text-antiqueGold/45">查看本次补充背景</summary>
+              <p className="mt-4 text-sm leading-7">{context}</p>
+            </details>
+          )}
+
+          {isStructuredReadingV3(structured) && (
+            <motion.section
+              className="reading-story-section border-b border-antiqueGold/10"
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: .55 }}
+            >
+              <p className="font-display text-[10px] uppercase tracking-[.4em] text-antiqueGold/60">What you are really asking</p>
+              <h2 className="mt-3 font-zhSerif text-3xl tracking-[.08em] text-moon">问题真正卡住的地方</h2>
+              <p className="mt-7 font-zhSerif text-[18px] leading-9 tracking-[.035em] text-moon/82">
+                {renderInlineMarkdown(structured.questionFocus)}
+              </p>
+            </motion.section>
           )}
 
           <motion.section
@@ -249,6 +275,26 @@ export function ReadingPanel({
               {renderInlineMarkdown(structured.connections)}
             </p>
           </motion.section>
+
+          {isStructuredReadingV3(structured) && (
+            <motion.section
+              className="reading-story-section border-t border-antiqueGold/10"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: .65, delay: .28 }}
+            >
+              <p className="font-display text-[10px] uppercase tracking-[.4em] text-antiqueGold/60">Reality checks</p>
+              <h2 className="mt-3 font-zhSerif text-3xl tracking-[.08em] text-moon">回到现实里验证</h2>
+              <ol className="mt-7 space-y-5">
+                {structured.realityChecks.map((item, index) => (
+                  <li key={item} className="flex gap-4 font-zhSerif text-[18px] leading-9 tracking-[.035em] text-moon/82">
+                    <span className="mt-1 font-display text-xs text-antiqueGold/55">0{index + 1}</span>
+                    <span>{renderInlineMarkdown(item)}</span>
+                  </li>
+                ))}
+              </ol>
+            </motion.section>
+          )}
 
           <motion.section
             className="reading-story-section border-t border-antiqueGold/10"

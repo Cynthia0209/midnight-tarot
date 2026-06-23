@@ -15,6 +15,7 @@ export type ReadingSession = {
   id: string;
   spreadId: string;
   question: string;
+  context?: string;
   stage: ReadingStage;
   deck: DeckCard[];
   selected: SelectedReadingCard[];
@@ -27,7 +28,7 @@ export type StructuredReadingCard = {
   interpretation: string;
 };
 
-export type StructuredReading = {
+export type StructuredReadingV2 = {
   version: 2;
   opening: string;
   cards: StructuredReadingCard[];
@@ -35,12 +36,24 @@ export type StructuredReading = {
   summary: string;
 };
 
+export type StructuredReadingV3 = {
+  version: 3;
+  questionFocus: string;
+  opening: string;
+  cards: StructuredReadingCard[];
+  connections: string;
+  realityChecks: [string, string];
+  summary: string;
+};
+
+export type StructuredReading = StructuredReadingV2 | StructuredReadingV3;
 export type ReadingContent = string | StructuredReading;
 
 export type SavedReading = {
   id: string;
   spreadId: string;
   question: string;
+  context?: string;
   cards: SelectedReadingCard[];
   reading: ReadingContent;
   createdAt: string;
@@ -69,11 +82,12 @@ export function createShuffledDeck(cardIds: number[]): DeckCard[] {
   }));
 }
 
-export function createSession(spreadId: string, question: string, cardIds: number[]): ReadingSession {
+export function createSession(spreadId: string, question: string, cardIds: number[], context = ""): ReadingSession {
   return {
     id: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`,
     spreadId,
     question,
+    context: context.trim() || undefined,
     stage: "shuffle",
     deck: createShuffledDeck(cardIds),
     selected: [],
@@ -107,15 +121,20 @@ export function buildFallbackReading(question: string, cards: Array<{ nameZh: st
 
 export function buildStructuredFallbackReading(
   question: string,
+  context: string,
   cards: Array<{ positionId: string; positionTitle: string; nameZh: string; meaning: string }>
-): StructuredReading {
+): StructuredReadingV3 {
+  const detail = context.trim()
+    ? `你补充的情况是：“${context.trim().slice(0, 96)}”。`
+    : "";
   const focus = question.trim()
-    ? `关于“${question.trim().slice(0, 48)}”，这组牌更像是在梳理你已经隐约感觉到、却还没有完全说清的部分。`
+    ? `你真正想确认的是：“${question.trim().slice(0, 72)}”。`
     : "这组牌没有急着给出结论，而是把此刻最值得留意的线索一张张放在你面前。";
 
   return {
-    version: 2,
-    opening: `${focus}先不必把它当成命令，留意哪些画面让你停顿，那里往往比一个仓促的答案更接近问题核心。`,
+    version: 3,
+    questionFocus: `${focus}${detail}`,
+    opening: "完整解读仍在生成。先从牌面的基础含义开始看，留意它与你描述的现实处境在哪一点发生了呼应。",
     cards: cards.map((item) => ({
       positionId: item.positionId,
       positionTitle: item.positionTitle,
@@ -124,14 +143,18 @@ export function buildStructuredFallbackReading(
     connections: cards.length > 1
       ? "把这些牌放在一起看，它们呈现的不是彼此割裂的事件，而是一条正在形成的路径：前面的经验影响着当下的反应，而当下的选择又会改变后续的走向。"
       : "这一张牌既是此刻的镜子，也是一处停顿。它提醒你先看清正在发生的真实感受，再决定下一步。",
-    summary: "最终需要被带回现实的，不是一个绝对预言，而是一个可以观察的信号：接下来当相似的情绪、关系模式或选择再次出现时，你是否能比过去更早认出它？",
+    realityChecks: [
+      "观察接下来一次相关沟通中，对方实际做了什么，而不只看自己希望它代表什么。",
+      "留意同一个犹豫是否再次出现，以及触发它的是事实变化，还是熟悉的担心。",
+    ],
+    summary: "在完整解读返回前，先不要急着根据牌做决定。把问题带回一个可验证的现实动作：确认信息、提出具体问题，或为自己设定一个清楚的时间点。",
   };
 }
 
 export function isStructuredReading(value: unknown): value is StructuredReading {
   if (!value || typeof value !== "object") return false;
   const reading = value as Partial<StructuredReading>;
-  return reading.version === 2
+  const commonValid = (reading.version === 2 || reading.version === 3)
     && typeof reading.opening === "string"
     && Array.isArray(reading.cards)
     && reading.cards.every((card) =>
@@ -142,14 +165,27 @@ export function isStructuredReading(value: unknown): value is StructuredReading 
     )
     && typeof reading.connections === "string"
     && typeof reading.summary === "string";
+  if (!commonValid) return false;
+  if (reading.version === 2) return true;
+  const version3 = reading as Partial<StructuredReadingV3>;
+  return typeof version3.questionFocus === "string"
+    && Array.isArray(version3.realityChecks)
+    && version3.realityChecks.length === 2
+    && version3.realityChecks.every((item) => typeof item === "string");
+}
+
+export function isStructuredReadingV3(reading: StructuredReading): reading is StructuredReadingV3 {
+  return reading.version === 3;
 }
 
 export function readingToPlainText(reading: ReadingContent): string {
   if (typeof reading === "string") return reading;
   return [
+    ...(reading.version === 3 ? [reading.questionFocus] : []),
     reading.opening,
     ...reading.cards.map((card) => `${card.positionTitle}：${card.interpretation}`),
     reading.connections,
+    ...(reading.version === 3 ? [`现实观察：${reading.realityChecks.join("；")}`] : []),
     reading.summary,
   ].join("\n\n");
 }

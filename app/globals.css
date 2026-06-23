@@ -69,6 +69,8 @@ button { -webkit-tap-highlight-color: transparent; }
   transform:translateX(-50%) rotate(var(--fan-angle));
   transform-origin:50% 155%;
 }
+.fan-hit-slot:hover,
+.fan-hit-slot:focus-visible { z-index:320 !important; }
 .reading-text p { margin:0 0 1.15em; }
 .reading-story-section { padding:3.5rem 0; }
 .reading-card-list { scrollbar-width:thin; scrollbar-color:rgba(216,191,136,.2) transparent; }
@@ -77,12 +79,6 @@ button { -webkit-tap-highlight-color: transparent; }
 .reading-card-list::-webkit-scrollbar-thumb { border-radius:999px; background:rgba(216,191,136,.2); }
 
 @media (min-width:768px) {
-  .fan-deck-track { min-width:0 !important; }
-  .fan-card {
-    left:var(--fan-left-desktop) !important;
-    top:var(--fan-top-desktop) !important;
-    transform:translate(-50%,-50%) rotate(var(--fan-angle));
-  }
   .spread-slot {
     left:var(--desktop-x) !important;
     top:var(--desktop-y) !important;

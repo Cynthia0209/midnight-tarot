@@ -14,6 +14,7 @@ export const runtime = "nodejs";
 type RequestBody = {
   spreadId?: string;
   question?: string;
+  context?: string;
   cards?: Array<{
     positionId?: string;
     cardId?: number;
@@ -30,11 +31,13 @@ function parseModelJson(content: string): unknown {
 
 function validateReading(reading: unknown, expectedPositionIds: string[]): StructuredReading | null {
   if (!isStructuredReading(reading)) return null;
+  if (reading.version !== 3) return null;
   if (reading.cards.length !== expectedPositionIds.length) return null;
   const actualIds = reading.cards.map((card) => card.positionId);
   if (new Set(actualIds).size !== actualIds.length) return null;
   if (actualIds.some((id, index) => id !== expectedPositionIds[index])) return null;
   if (!reading.opening.trim() || !reading.connections.trim() || !reading.summary.trim()) return null;
+  if (!reading.questionFocus.trim() || reading.realityChecks.some((item) => !item.trim())) return null;
   if (reading.cards.some((card) => !card.interpretation.trim())) return null;
   return reading;
 }
@@ -54,6 +57,9 @@ export async function POST(request: NextRequest) {
   if (typeof body.question === "string" && body.question.length > 240) {
     return NextResponse.json({ error: "问题内容过长。" }, { status: 400 });
   }
+  if (body.context !== undefined && (typeof body.context !== "string" || body.context.length > 500)) {
+    return NextResponse.json({ error: "补充背景内容无效或过长。" }, { status: 400 });
+  }
 
   const seen = new Set<number>();
   const selectedCards = body.cards.map((item, index) => {
@@ -70,6 +76,7 @@ export async function POST(request: NextRequest) {
   const cards = selectedCards as NonNullable<(typeof selectedCards)[number]>[];
   const fallback = buildStructuredFallbackReading(
     body.question ?? "",
+    body.context ?? "",
     cards.map(({ card, position, orientation }) => ({
       positionId: position.id,
       positionTitle: position.titleZh,
@@ -92,13 +99,14 @@ export async function POST(request: NextRequest) {
           role: "user",
           content: buildReadingPrompt({
             question: body.question,
+            context: body.context,
             spread,
             selectedCards: cards,
           }),
         },
       ],
       response_format: { type: "json_object" },
-      temperature: 0.8,
+      temperature: 0.7,
       max_tokens: maxTokens,
     }, {
       signal: AbortSignal.timeout(30000),
