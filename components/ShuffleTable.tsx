@@ -5,10 +5,11 @@ import { gsap } from "gsap";
 import { useGSAP } from "@gsap/react";
 import { TarotCardView } from "@/components/TarotCardView";
 import { playRitualSound } from "@/lib/sound";
+import type { Locale } from "@/lib/locale";
 
 gsap.registerPlugin(useGSAP);
 
-export function ShuffleTable({ muted, onComplete }: { muted: boolean; onComplete: () => void }) {
+export function ShuffleTable({ muted, onComplete, locale = "zh" }: { muted: boolean; onComplete: () => void; locale?: Locale }) {
   const root = useRef<HTMLDivElement>(null);
   const completed = useRef(false);
 
@@ -43,7 +44,7 @@ export function ShuffleTable({ muted, onComplete }: { muted: boolean; onComplete
   }, { scope: root });
 
   return (
-    <div ref={root} className="relative mx-auto flex h-[360px] w-full max-w-xl items-center justify-center" aria-label="正在洗牌">
+    <div ref={root} className="relative mx-auto flex h-[360px] w-full max-w-xl items-center justify-center" aria-label={locale === "en" ? "Shuffling the deck" : "正在洗牌"}>
       {Array.from({ length: 12 }, (_, index) => (
         <div key={index} className="shuffle-card absolute" style={{ zIndex: index }}>
           <TarotCardView disabled compact style={{ transform: `translate(${index * .45}px, ${-index * .35}px)` }} />
@@ -51,7 +52,7 @@ export function ShuffleTable({ muted, onComplete }: { muted: boolean; onComplete
       ))}
       <div className="absolute bottom-3 text-center">
         <p className="font-display text-xs uppercase tracking-[.42em] text-antiqueGold/70">The deck remembers</p>
-        <p className="mt-3 font-zhSerif text-sm tracking-[.2em] text-moon/50">牌序正在为这一次提问固定下来</p>
+        <p className="mt-3 font-zhSerif text-sm tracking-[.2em] text-moon/50">{locale === "en" ? "The deck order is settling for this question" : "牌序正在为这一次提问固定下来"}</p>
       </div>
     </div>
   );

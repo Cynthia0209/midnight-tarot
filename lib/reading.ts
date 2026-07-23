@@ -1,4 +1,5 @@
 import type { CardOrientation } from "@/data/tarotCards";
+import type { Locale } from "@/lib/locale";
 
 export type ReadingStage = "intro" | "spread" | "intention" | "shuffle" | "connect" | "draw" | "reveal" | "reading";
 
@@ -16,6 +17,7 @@ export type ReadingSession = {
   spreadId: string;
   question: string;
   context?: string;
+  locale: Locale;
   stage: ReadingStage;
   deck: DeckCard[];
   selected: SelectedReadingCard[];
@@ -54,6 +56,7 @@ export type SavedReading = {
   spreadId: string;
   question: string;
   context?: string;
+  locale?: Locale;
   cards: SelectedReadingCard[];
   reading: ReadingContent;
   createdAt: string;
@@ -82,12 +85,13 @@ export function createShuffledDeck(cardIds: number[]): DeckCard[] {
   }));
 }
 
-export function createSession(spreadId: string, question: string, cardIds: number[], context = ""): ReadingSession {
+export function createSession(spreadId: string, question: string, cardIds: number[], context = "", locale: Locale = "en"): ReadingSession {
   return {
     id: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`,
     spreadId,
     question,
     context: context.trim() || undefined,
+    locale,
     stage: "shuffle",
     deck: createShuffledDeck(cardIds),
     selected: [],
@@ -122,8 +126,37 @@ export function buildFallbackReading(question: string, cards: Array<{ nameZh: st
 export function buildStructuredFallbackReading(
   question: string,
   context: string,
-  cards: Array<{ positionId: string; positionTitle: string; nameZh: string; meaning: string }>
+  cards: Array<{ positionId: string; positionTitle: string; nameZh: string; name?: string; meaning: string }>,
+  locale: Locale = "zh",
 ): StructuredReadingV3 {
+  if (locale === "en") {
+    const detail = context.trim()
+      ? `You added this context: "${context.trim().slice(0, 120)}".`
+      : "";
+    const focus = question.trim()
+      ? `You are really asking: "${question.trim().slice(0, 96)}".`
+      : "These cards are not rushing toward a conclusion; they are placing the most useful clues in front of you.";
+
+    return {
+      version: 3,
+      questionFocus: `${focus}${detail ? ` ${detail}` : ""}`,
+      opening: "The full reading is still forming. Start with the basic card meanings and notice where they touch your real situation.",
+      cards: cards.map((item) => ({
+        positionId: item.positionId,
+        positionTitle: item.positionTitle,
+        interpretation: `${item.name ?? item.nameZh} appears in ${item.positionTitle}. ${item.meaning}`,
+      })),
+      connections: cards.length > 1
+        ? "Taken together, these cards do not describe separate events. They form a path: what came before shapes your current response, and your current choice changes what comes next."
+        : "This single card is both a mirror and a pause. It asks you to see the real feeling clearly before deciding the next step.",
+      realityChecks: [
+        "Watch the next relevant conversation for what the other person actually does, not only what you hope it means.",
+        "Notice whether the same hesitation returns, and whether it is triggered by new facts or by a familiar fear.",
+      ],
+      summary: "Before treating the cards as a decision, bring the question back to one verifiable action: clarify information, ask a specific question, or set a clear time to review what has changed.",
+    };
+  }
+
   const detail = context.trim()
     ? `你补充的情况是：“${context.trim().slice(0, 96)}”。`
     : "";
@@ -178,14 +211,48 @@ export function isStructuredReadingV3(reading: StructuredReading): reading is St
   return reading.version === 3;
 }
 
+export function personalizeReadingText(text: string): string {
+  return text
+    .replace(/这位用户/g, "你")
+    .replace(/该用户/g, "你")
+    .replace(/用户/g, "你")
+    .replace(/提问者/g, "你")
+    .replace(/来访者/g, "你")
+    .replace(/求问者/g, "你");
+}
+
+export function personalizeReadingContent(reading: ReadingContent): ReadingContent {
+  if (typeof reading === "string") return personalizeReadingText(reading);
+
+  const common = {
+    ...reading,
+    opening: personalizeReadingText(reading.opening),
+    cards: reading.cards.map((card) => ({
+      ...card,
+      interpretation: personalizeReadingText(card.interpretation),
+    })),
+    connections: personalizeReadingText(reading.connections),
+    summary: personalizeReadingText(reading.summary),
+  };
+
+  if (reading.version === 2) return common;
+  return {
+    ...common,
+    version: 3,
+    questionFocus: personalizeReadingText(reading.questionFocus),
+    realityChecks: reading.realityChecks.map(personalizeReadingText) as [string, string],
+  };
+}
+
 export function readingToPlainText(reading: ReadingContent): string {
-  if (typeof reading === "string") return reading;
+  const personalized = personalizeReadingContent(reading);
+  if (typeof personalized === "string") return personalized;
   return [
-    ...(reading.version === 3 ? [reading.questionFocus] : []),
-    reading.opening,
-    ...reading.cards.map((card) => `${card.positionTitle}：${card.interpretation}`),
-    reading.connections,
-    ...(reading.version === 3 ? [`现实观察：${reading.realityChecks.join("；")}`] : []),
-    reading.summary,
+    ...(personalized.version === 3 ? [personalized.questionFocus] : []),
+    personalized.opening,
+    ...personalized.cards.map((card) => `${card.positionTitle}：${card.interpretation}`),
+    personalized.connections,
+    ...(personalized.version === 3 ? [`现实观察：${personalized.realityChecks.join("；")}`] : []),
+    personalized.summary,
   ].join("\n\n");
 }

@@ -4,12 +4,14 @@ import type { TarotSpread } from "@/data/spreads";
 import { tarotCardById } from "@/data/tarotCards";
 import type { SelectedReadingCard } from "@/lib/reading";
 import { TarotCardView } from "@/components/TarotCardView";
+import type { Locale } from "@/lib/locale";
 
 type Props = {
   spread: TarotSpread;
   selected: SelectedReadingCard[];
   revealCount: number;
   showMeanings?: boolean;
+  locale?: Locale;
 };
 
 export function SpreadBoard({
@@ -17,6 +19,7 @@ export function SpreadBoard({
   selected,
   revealCount,
   showMeanings = false,
+  locale = "zh",
 }: Props) {
   const tall = spread.positions.length >= 10;
   return (
@@ -48,16 +51,19 @@ export function SpreadBoard({
                   disabled
                   compact={spread.positions.length >= 5}
                   flipId={`card-${item.cardId}`}
+                  locale={locale}
                 />
               ) : (
                 <div className={`${spread.positions.length >= 5 ? "w-[78px] sm:w-[92px] md:w-[108px]" : "w-[112px] sm:w-[126px] md:w-[142px]"} aspect-[.57] rounded-[12px] border border-dashed border-antiqueGold/25 bg-white/[.015]`} />
               )}
             </div>
             <div className="spread-slot-label mt-2 w-28 text-center">
-              <p className="font-zhSerif text-[11px] tracking-[.08em] text-antiqueGold/85">{position.titleZh}</p>
+              <p className="font-zhSerif text-[11px] tracking-[.08em] text-antiqueGold/85">{locale === "en" ? position.title : position.titleZh}</p>
               {showMeanings && index < revealCount && card && (
                 <p className="mt-1 hidden text-[9px] leading-4 text-moon/45 sm:block">
-                  {item.orientation === "reversed" ? card.reversedKeywords.slice(0, 2).join(" · ") : card.uprightKeywords.slice(0, 2).join(" · ")}
+                  {item.orientation === "reversed"
+                    ? (locale === "en" ? card.reversedKeywordsEn : card.reversedKeywords).slice(0, 2).join(" · ")
+                    : (locale === "en" ? card.uprightKeywordsEn : card.uprightKeywords).slice(0, 2).join(" · ")}
                 </p>
               )}
             </div>

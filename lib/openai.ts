@@ -10,6 +10,8 @@ export function getOpenAI() {
 	client ??= new OpenAI({
 		apiKey: process.env.DEEPSEEK_API_KEY,
 		baseURL: "https://api.deepseek.com",
+		maxRetries: 0,
+		timeout: Number(process.env.DEEPSEEK_TIMEOUT_MS ?? 24000),
 	});
 
 	return client;
