@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 import { tarotCardById } from "@/data/tarotCards";
 import { spreadById } from "@/data/spreads";
 import { buildFollowupPrompt, getSystemPrompt, type PromptCard } from "@/lib/prompts";
-import { getOpenAI } from "@/lib/openai";
+import { getDeepSeekModel, getOpenAI } from "@/lib/openai";
 import { getAnonymousClient, supabaseRest } from "@/lib/supabaseServer";
 import {
   isStructuredReading,
@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
     });
     const timeoutMs = Number(process.env.DEEPSEEK_FOLLOWUP_TIMEOUT_MS ?? 22000);
     const completion = await getOpenAI().chat.completions.create({
-      model: process.env.DEEPSEEK_MODEL ?? "deepseek-v4-flash",
+      model: getDeepSeekModel(),
       messages: [
         { role: "system", content: getSystemPrompt(locale) },
         { role: "user", content: prompt },

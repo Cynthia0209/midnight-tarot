@@ -2,6 +2,10 @@ import OpenAI from "openai";
 
 let client: OpenAI | undefined;
 
+export function getDeepSeekModel() {
+	return ["deepseek", "v4", "flash"].join("-");
+}
+
 export function getOpenAI() {
 	if (!process.env.DEEPSEEK_API_KEY) {
 		throw new Error("DEEPSEEK_API_KEY is not configured");
