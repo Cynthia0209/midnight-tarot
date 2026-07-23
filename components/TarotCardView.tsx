@@ -5,6 +5,7 @@ import { forwardRef } from "react";
 import type { CSSProperties, MouseEvent } from "react";
 import type { CardOrientation, TarotCard } from "@/data/tarotCards";
 import { cx } from "@/lib/utils";
+import type { Locale } from "@/lib/locale";
 
 type Props = {
   card?: TarotCard;
@@ -18,6 +19,7 @@ type Props = {
   style?: CSSProperties;
   flipId?: string;
   tabIndex?: number;
+  locale?: Locale;
 };
 
 export const TarotCardView = forwardRef<HTMLButtonElement, Props>(function TarotCardView({
@@ -32,12 +34,19 @@ export const TarotCardView = forwardRef<HTMLButtonElement, Props>(function Tarot
   style,
   flipId,
   tabIndex,
+  locale = "zh",
 }, ref) {
+  const cardLabel = revealed && card
+    ? locale === "en"
+      ? `${card.name} ${orientation}`
+      : `${card.nameZh} ${orientation === "reversed" ? "逆位" : "正位"}`
+    : locale === "en" ? "Unrevealed tarot card" : "未揭示的塔罗牌";
+
   return (
     <button
       ref={ref}
       type="button"
-      aria-label={revealed && card ? `${card.nameZh} ${orientation === "reversed" ? "逆位" : "正位"}` : "未揭示的塔罗牌"}
+      aria-label={cardLabel}
       aria-pressed={selected}
       disabled={disabled}
       onClick={onClick}
@@ -72,13 +81,13 @@ export const TarotCardView = forwardRef<HTMLButtonElement, Props>(function Tarot
             <>
               <span className="absolute inset-0 flex flex-col items-center justify-center bg-[radial-gradient(circle_at_50%_35%,#3b2149,#17101d_72%)] p-3 text-center">
                 <span className="text-2xl text-antiqueGold/75">✦</span>
-                <span className="mt-3 font-zhSerif text-sm tracking-[.12em] text-moon/85">{card.nameZh}</span>
+                <span className="mt-3 font-zhSerif text-sm tracking-[.12em] text-moon/85">{locale === "en" ? card.name : card.nameZh}</span>
                 <span className="mt-1 font-display text-[8px] uppercase tracking-[.12em] text-antiqueGold/55">{card.name}</span>
               </span>
               {revealed && (
                 <Image
                   src={card.imagePath}
-                  alt={`${card.nameZh} ${card.name}`}
+                  alt={locale === "en" ? card.name : `${card.nameZh} ${card.name}`}
                   fill
                   sizes="(max-width: 640px) 112px, 142px"
                   className="card-image object-cover"
