@@ -80,7 +80,6 @@ Open `.env.local` and add your own DeepSeek API key:
 
 ```bash
 DEEPSEEK_API_KEY=your_deepseek_api_key_here
-DEEPSEEK_MODEL=deepseek-v4-flash
 DEEPSEEK_TIMEOUT_MS=45000
 DEEPSEEK_FOLLOWUP_TIMEOUT_MS=30000
 ```
@@ -130,7 +129,6 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 | Variable | Required | Purpose |
 | --- | --- | --- |
 | `DEEPSEEK_API_KEY` | Yes for AI readings | Your DeepSeek API key. |
-| `DEEPSEEK_MODEL` | No | Defaults to `deepseek-v4-flash`. |
 | `DEEPSEEK_TIMEOUT_MS` | No | Reading request timeout. |
 | `DEEPSEEK_FOLLOWUP_TIMEOUT_MS` | No | Follow-up request timeout. |
 | `NEXT_PUBLIC_SITE_URL` | No | Used when generating links or share context. |

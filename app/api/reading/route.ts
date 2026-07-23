@@ -10,7 +10,7 @@ import {
   type StructuredReading,
   type StructuredReadingV3,
 } from "@/lib/reading";
-import { getOpenAI } from "@/lib/openai";
+import { getDeepSeekModel, getOpenAI } from "@/lib/openai";
 import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 import { isLocale, type Locale } from "@/lib/locale";
 
@@ -197,7 +197,7 @@ export async function POST(request: NextRequest) {
     const timeoutMs = Number(process.env.DEEPSEEK_TIMEOUT_MS ?? Math.min(45000, 24000 + cards.length * 1800));
     const upstreamStartedAt = Date.now();
     const completion = await getOpenAI().chat.completions.create({
-      model: process.env.DEEPSEEK_MODEL ?? "deepseek-v4-flash",
+      model: getDeepSeekModel(),
       messages: [
         { role: "system", content: getSystemPrompt(locale) },
         {
