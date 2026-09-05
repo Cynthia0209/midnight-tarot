@@ -67,13 +67,13 @@ This project is more than a themed form wrapped around an LLM call. The interact
 
 ```mermaid
 flowchart LR
-  A[Browser ritual UI] --> B[Next.js App Router]
-  A --> C[Local draft and archive]
-  B --> D[/api/reading]
-  B --> E[/api/readings and /api/followups]
-  D --> F[DeepSeek API]
-  E --> G[Supabase Postgres]
-  A --> H[Canvas and Markdown exports]
+  A["Browser ritual UI"] --> B["Next.js App Router"]
+  A --> C["Local draft and archive"]
+  B --> D["/api/reading"]
+  B --> E["/api/readings and /api/followups"]
+  D --> F["DeepSeek API"]
+  E --> G["Supabase Postgres"]
+  A --> H["Canvas and Markdown exports"]
 ```
 
 | Layer | Main choices |
