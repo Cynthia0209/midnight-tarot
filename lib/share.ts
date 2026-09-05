@@ -74,6 +74,14 @@ function wrapRichText(context: CanvasRenderingContext2D, text: string, maxWidth:
   let line: RichLine = [];
   let lineWidth = 0;
 
+  const append = (textValue: string, bold: boolean) => {
+    if (!textValue) return;
+    const previous = line[line.length - 1];
+    if (previous?.bold === bold) previous.text += textValue;
+    else line.push({ text: textValue, bold });
+    lineWidth += measureSegment(context, { text: textValue, bold });
+  };
+
   const pushLine = () => {
     if (line.length) lines.push(line);
     line = [];
@@ -81,29 +89,28 @@ function wrapRichText(context: CanvasRenderingContext2D, text: string, maxWidth:
   };
 
   for (const segment of splitMarkdownBold(text)) {
-    let buffer = "";
-    for (const char of segment.text) {
-      const candidate = buffer + char;
-      const candidateSegment = { text: candidate, bold: segment.bold };
-      const candidateWidth = measureSegment(context, candidateSegment);
+    const tokens = segment.text.match(/[\s]+|[\u3400-\u9fff]|[^\s\u3400-\u9fff]+/g) ?? [];
+    for (const rawToken of tokens) {
+      const whitespace = /^\s+$/.test(rawToken);
+      const token = line.length ? rawToken : rawToken.trimStart();
+      if (!token) continue;
+      const tokenWidth = measureSegment(context, { text: token, bold: segment.bold });
 
-      if (lineWidth + candidateWidth > maxWidth && (line.length || buffer)) {
-        if (buffer) {
-          line.push({ text: buffer, bold: segment.bold });
-        }
+      if (whitespace && lineWidth + tokenWidth > maxWidth) {
         pushLine();
-        buffer = char.trimStart();
-      } else {
-        buffer = candidate;
+        continue;
       }
-    }
+      if (!whitespace && line.length && lineWidth + tokenWidth > maxWidth) pushLine();
 
-    if (buffer) {
-      const bufferedSegment = { text: buffer, bold: segment.bold };
-      const bufferedWidth = measureSegment(context, bufferedSegment);
-      if (lineWidth + bufferedWidth > maxWidth && line.length) pushLine();
-      line.push(bufferedSegment);
-      lineWidth += bufferedWidth;
+      if (!whitespace && tokenWidth > maxWidth) {
+        for (const char of token) {
+          const charWidth = measureSegment(context, { text: char, bold: segment.bold });
+          if (line.length && lineWidth + charWidth > maxWidth) pushLine();
+          append(char, segment.bold);
+        }
+      } else {
+        append(line.length ? token : token.trimStart(), segment.bold);
+      }
     }
   }
 
@@ -316,12 +323,23 @@ export async function createShareImage(reading: SavedReading): Promise<File> {
   if (!measureContext) throw new Error("Canvas is unavailable");
   const locale = reading.locale ?? "zh";
   const sections = readingToShareSections(reading.reading, reading.cards, locale);
-  const textStartY = 720;
+  const cardCount = reading.cards.length;
+  const cardCols = Math.min(cardCount, 5);
+  const cardRows = Math.ceil(cardCount / cardCols);
+  const gridPad = 64;
+  const gridUsable = 1080 - gridPad * 2;
+  const cellW = gridUsable / cardCols;
+  const imageWidth = Math.min(136, cellW - 32);
+  const imageHeight = Math.round(imageWidth * (220 / 136));
+  const rowGap = 70;
+  const cardTop = 360;
+  const cardBlockHeight = cardRows * imageHeight + (cardRows - 1) * rowGap;
+  const textStartY = Math.max(720, cardTop + cardBlockHeight + 64);
   const estimatedTextHeight = sections.reduce((total, section) => total + sectionHeight(measureContext, section), 0);
 
   const canvas = document.createElement("canvas");
   canvas.width = 1080;
-  canvas.height = Math.max(1440, Math.min(6400, textStartY + estimatedTextHeight + 170));
+  canvas.height = Math.max(1440, Math.ceil(textStartY + estimatedTextHeight + 180));
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Canvas is unavailable");
 
@@ -357,16 +375,16 @@ export async function createShareImage(reading: SavedReading): Promise<File> {
     }),
   );
 
-  const cardSpacing = Math.min(190, 820 / reading.cards.length);
-  const startX = 540 - ((reading.cards.length - 1) * cardSpacing) / 2;
+  const colOf = (index: number) => index % cardCols;
+  const rowOf = (index: number) => Math.floor(index / cardCols);
   reading.cards.forEach((selected, index) => {
     const card = tarotCardById.get(selected.cardId);
     const image = loadedCardImages[index];
-    const x = startX + index * cardSpacing;
-    const imageX = x - 68;
-    const imageY = 360;
-    const imageWidth = 136;
-    const imageHeight = 220;
+    const col = colOf(index);
+    const row = rowOf(index);
+    const cellCenterX = gridPad + cellW * (col + 0.5);
+    const imageX = Math.round(cellCenterX - imageWidth / 2);
+    const imageY = cardTop + row * (imageHeight + rowGap);
 
     context.fillStyle = "#21132f";
     context.strokeStyle = "rgba(211,185,126,.55)";
@@ -389,7 +407,7 @@ export async function createShareImage(reading: SavedReading): Promise<File> {
     } else {
       context.fillStyle = "#d8bf88";
       context.font = "38px Georgia";
-      context.fillText("✦", x, 465);
+      context.fillText("✦", cellCenterX, imageY + imageHeight / 2 + 12);
     }
     context.strokeStyle = "rgba(211,185,126,.72)";
     context.lineWidth = 2;
@@ -399,10 +417,10 @@ export async function createShareImage(reading: SavedReading): Promise<File> {
     context.strokeRect(imageX + 6, imageY + 6, imageWidth - 12, imageHeight - 12);
     context.fillStyle = "#f5efe7";
     context.font = "18px serif";
-    context.fillText(locale === "en" ? card?.name ?? "" : card?.nameZh ?? "", x, 615);
+    context.fillText(locale === "en" ? card?.name ?? "" : card?.nameZh ?? "", cellCenterX, imageY + imageHeight + 24);
     context.fillStyle = "rgba(245,239,231,.6)";
     context.font = "14px sans-serif";
-    context.fillText(selected.orientation === "reversed" ? locale === "en" ? "reversed" : "逆位" : locale === "en" ? "upright" : "正位", x, 640);
+    context.fillText(selected.orientation === "reversed" ? locale === "en" ? "reversed" : "逆位" : locale === "en" ? "upright" : "正位", cellCenterX, imageY + imageHeight + 46);
   });
 
   let cursorY = textStartY;
@@ -413,7 +431,11 @@ export async function createShareImage(reading: SavedReading): Promise<File> {
   context.textAlign = "center";
   context.fillStyle = "rgba(216,191,136,.7)";
   context.font = "20px Georgia";
-  context.fillText(locale === "en" ? "Treat the cards as a mirror, not a command." : "把牌当作镜子，而不是命令。", 540, canvas.height - 92);
+  context.fillText(locale === "en" ? "Treat the cards as a mirror, not a command." : "把牌当作镜子，而不是命令。", 540, canvas.height - 96);
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "midnight-tarot.app";
+  context.fillStyle = "rgba(216,191,136,.55)";
+  context.font = "18px Georgia";
+  context.fillText(locale === "en" ? `Read at Midnight Tarot · ${siteUrl}` : `来自 Midnight Tarot · ${siteUrl}`, 540, canvas.height - 56);
 
   const blob = await new Promise<Blob>((resolve, reject) =>
     canvas.toBlob((value) => value ? resolve(value) : reject(new Error("Could not create image")), "image/png")

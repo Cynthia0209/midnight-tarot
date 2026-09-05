@@ -18,11 +18,19 @@ function getAudioContext() {
 
 export function getMuted() {
   if (typeof window === "undefined") return false;
-  return window.localStorage.getItem(MUTE_KEY) === "true";
+  try {
+    return window.localStorage.getItem(MUTE_KEY) === "true";
+  } catch {
+    return false;
+  }
 }
 
 export function setMuted(muted: boolean) {
-  window.localStorage.setItem(MUTE_KEY, String(muted));
+  try {
+    window.localStorage.setItem(MUTE_KEY, String(muted));
+  } catch {
+    // Sound still changes for the current page even if the preference cannot persist.
+  }
 }
 
 export async function unlockRitualSound() {

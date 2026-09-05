@@ -3,6 +3,7 @@
 The 78 images reproduce the original Rider–Waite–Smith artwork published in 1909.
 
 - Local download mirror: https://github.com/seven102161/elaine-tarot-cards
+- Corrected swords/pentacles fallback images: https://commons.wikimedia.org/wiki/Rider-Waite_tarot_deck
 - Mirror provenance: Wikimedia Commons “Roses & Lilies” scans and public-domain RWS mirrors documented in that repository
 - Copyright overview: https://commons.wikimedia.org/wiki/Rider-Waite_tarot_deck
 

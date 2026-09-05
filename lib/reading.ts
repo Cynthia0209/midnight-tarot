@@ -100,21 +100,77 @@ export function createSession(spreadId: string, question: string, cardIds: numbe
 }
 
 const STORAGE_KEY = "midnight-tarot-readings-v1";
+const DRAFT_KEY = "midnight-tarot-session-draft-v1";
+
+export type SessionDraft = {
+  stage: ReadingStage;
+  session: ReadingSession;
+  revealCount: number;
+  savedAt: string;
+};
+
+const DRAFT_STAGES: ReadingStage[] = ["shuffle", "connect", "draw", "reveal", "reading"];
+
+export function loadDraft(): SessionDraft | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const draft = JSON.parse(raw) as SessionDraft;
+    if (!draft?.session?.id || !Array.isArray(draft.session.selected) || !Array.isArray(draft.session.deck)) return null;
+    if (!DRAFT_STAGES.includes(draft.stage)) return null;
+    return draft;
+  } catch {
+    return null;
+  }
+}
+
+export function saveDraft(draft: SessionDraft): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+  } catch {
+    // Storage may be full or unavailable; the ritual continues without a draft.
+  }
+}
+
+export function clearDraft(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(DRAFT_KEY);
+  } catch {
+    // Nothing to clean up.
+  }
+}
 
 export function loadReadings(): SavedReading[] {
   if (typeof window === "undefined") return [];
   try {
     const data = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "[]");
-    return Array.isArray(data) ? data.slice(0, 20) : [];
+    return Array.isArray(data) ? data.slice(0, 50) : [];
   } catch {
     return [];
   }
 }
 
 export function saveReading(reading: SavedReading): SavedReading[] {
-  const next = [reading, ...loadReadings().filter((item) => item.id !== reading.id)].slice(0, 20);
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  const next = [reading, ...loadReadings().filter((item) => item.id !== reading.id)].slice(0, 50);
+  if (typeof window === "undefined") return next;
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  } catch {
+    // Keep the completed reading in memory when storage is blocked or full.
+  }
   return next;
+}
+
+export function writeReadings(readings: SavedReading[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(readings.slice(0, 50)));
+  } catch {
+    // Storage unavailable; the in-memory list still reflects the change.
+  }
 }
 
 export function buildFallbackReading(question: string, cards: Array<{ nameZh: string; position: string; meaning: string }>) {

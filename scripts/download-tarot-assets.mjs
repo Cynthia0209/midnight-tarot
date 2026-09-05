@@ -1,4 +1,4 @@
-import { access, mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const outputDir = path.resolve("public/cards");
@@ -19,6 +19,20 @@ const suits = [
 const rankNames = ["Ace", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Page", "Knight", "Queen", "King"];
 const rankCodes = ["ac", "02", "03", "04", "05", "06", "07", "08", "09", "10", "pa", "kn", "qu", "ki"];
 
+// The mirror's nine fallback files are mislabeled. Use the explicitly named
+// Wikimedia Commons originals for these cards instead.
+const commonsOverrides = {
+  "ace-of-swords.jpg": "Swords01.jpg",
+  "page-of-swords.jpg": "Swords11.jpg",
+  "knight-of-swords.jpg": "Swords12.jpg",
+  "queen-of-swords.jpg": "Swords13.jpg",
+  "king-of-swords.jpg": "Swords14.jpg",
+  "page-of-pentacles.jpg": "Pents11.jpg",
+  "knight-of-pentacles.jpg": "Pents12.jpg",
+  "queen-of-pentacles.jpg": "Pents13.jpg",
+  "king-of-pentacles.jpg": "Pents14.jpg",
+};
+
 const files = majorNames.map((name, index) => ({
   local: `${slugify(name)}.jpg`,
   code: `ar${String(index).padStart(2, "0")}`,
@@ -30,11 +44,10 @@ const files = majorNames.map((name, index) => ({
 async function download(item, attempt = 1) {
   const target = path.join(outputDir, item.local);
   try {
-    await access(target);
-    return true;
-  } catch {}
-  try {
-    const url = `https://raw.githubusercontent.com/seven102161/elaine-tarot-cards/main/cards/${item.code}.jpg`;
+    const commonsFile = commonsOverrides[item.local];
+    const url = commonsFile
+      ? `https://commons.wikimedia.org/wiki/Special:Redirect/file/${commonsFile}`
+      : `https://raw.githubusercontent.com/seven102161/elaine-tarot-cards/main/cards/${item.code}.jpg`;
     const response = await fetch(url, { headers: { "User-Agent": "MidnightTarot/1.0" } });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     await writeFile(target, Buffer.from(await response.arrayBuffer()));
@@ -59,6 +72,7 @@ await writeFile(
 The 78 images reproduce the original Rider–Waite–Smith artwork published in 1909.
 
 - Local download mirror: https://github.com/seven102161/elaine-tarot-cards
+- Corrected swords/pentacles fallback images: https://commons.wikimedia.org/wiki/Rider-Waite_tarot_deck
 - Mirror provenance: Wikimedia Commons “Roses & Lilies” scans and public-domain RWS mirrors documented in that repository
 - Copyright overview: https://commons.wikimedia.org/wiki/Rider-Waite_tarot_deck
 

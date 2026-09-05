@@ -6,7 +6,6 @@ import { buildFollowupPrompt, getSystemPrompt, type PromptCard } from "@/lib/pro
 import { getDeepSeekModel, getOpenAI } from "@/lib/openai";
 import { getAnonymousClient, supabaseRest } from "@/lib/supabaseServer";
 import {
-  isStructuredReading,
   personalizeReadingText,
   readingToPlainText,
   type ReadingContent,
@@ -15,6 +14,7 @@ import {
 } from "@/lib/reading";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { isLocale, type Locale } from "@/lib/locale";
+import { recordEvent } from "@/lib/events";
 
 export const runtime = "nodejs";
 
@@ -42,29 +42,14 @@ type FollowupBody = {
   reading?: SavedReading;
 };
 
-function savedReadingToRow(reading: SavedReading | undefined, readingId: string): ReadingRow | null {
-  if (!reading || reading.id !== readingId) return null;
-  if (!spreadById.has(reading.spreadId) || !Array.isArray(reading.cards)) return null;
-  if (!(typeof reading.reading === "string" || isStructuredReading(reading.reading))) return null;
-  return {
-    id: reading.id,
-    client_id_hash: "client-payload",
-    spread_id: reading.spreadId,
-    question: reading.question ?? "",
-    context: reading.context ?? null,
-    cards: reading.cards,
-    reading: reading.reading,
-    locale: reading.locale,
-  };
-}
-
 export async function GET(request: NextRequest) {
+  const locale: Locale = isLocale(request.nextUrl.searchParams.get("locale")) ? (request.nextUrl.searchParams.get("locale") as Locale) : "zh";
   const client = getAnonymousClient(request);
-  if (!client) return NextResponse.json({ error: "当前浏览器凭证无效，请刷新页面后重试。" }, { status: 401 });
+  if (!client) return NextResponse.json({ error: locale === "en" ? "Your browser credential is no longer valid. Please refresh and try again." : "当前浏览器凭证无效，请刷新页面后重试。" }, { status: 401 });
   const readingId = request.nextUrl.searchParams.get("readingId");
-  if (!readingId) return NextResponse.json({ error: "缺少占卜 ID。" }, { status: 400 });
+  if (!readingId) return NextResponse.json({ error: locale === "en" ? "The reading ID is missing." : "缺少占卜 ID。" }, { status: 400 });
   const rows = await supabaseRest<FollowupRow[]>(
-    `followup_questions?reading_id=eq.${readingId}&client_id_hash=eq.${client.clientIdHash}&status=eq.answered&select=id,question,answer,created_at&order=created_at.asc&limit=50`,
+    `followup_questions?reading_id=eq.${readingId}&client_id_hash=eq.${client.clientIdHash}&status=eq.answered&select=id,question,answer,created_at&order=created_at.asc`,
   ).catch(() => []);
   return NextResponse.json({
     followups: rows.map((item) => ({
@@ -77,23 +62,23 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const client = getAnonymousClient(request);
-  if (!client) return NextResponse.json({ error: "当前浏览器凭证无效，请刷新页面后重试。" }, { status: 401 });
-  const limit = checkRateLimit(`followup:${client.clientIdHash}`, 10, 60_000);
-  if (!limit.ok) return NextResponse.json({ error: "追问太频繁了，请稍等一下再试。" }, { status: 429 });
   const body = await request.json().catch(() => null) as FollowupBody | null;
+  const locale: Locale = isLocale(body?.reading?.locale) ? body.reading.locale : "zh";
+  const client = getAnonymousClient(request);
+  if (!client) return NextResponse.json({ error: locale === "en" ? "Your browser credential is no longer valid. Please refresh and try again." : "当前浏览器凭证无效，请刷新页面后重试。" }, { status: 401 });
+  const limit = checkRateLimit(`followup:${client.clientIdHash}`, 10, 60_000);
+  if (!limit.ok) return NextResponse.json({ error: locale === "en" ? "You are asking a little too quickly. Please wait a moment." : "追问太频繁了，请稍等一下再试。" }, { status: 429 });
   const readingId = body?.readingId;
   const question = body?.question?.trim();
   if (!readingId || !question || question.length > 240) {
-    return NextResponse.json({ error: "追问内容无效，最多 240 字。" }, { status: 400 });
+    return NextResponse.json({ error: locale === "en" ? "The follow-up is invalid. Keep it under 240 characters." : "追问内容无效，最多 240 字。" }, { status: 400 });
   }
 
   const readingRows = await supabaseRest<ReadingRow[]>(
     `reading_sessions?id=eq.${readingId}&client_id_hash=eq.${client.clientIdHash}&select=id,client_id_hash,spread_id,question,context,cards,reading`,
   ).catch(() => []);
-  const reading = readingRows[0] ?? savedReadingToRow(body?.reading, readingId);
+  const reading = readingRows[0];
   const spread = reading ? spreadById.get(reading.spread_id) : undefined;
-  const locale: Locale = isLocale(body?.reading?.locale) ? body.reading.locale : isLocale(reading?.locale) ? reading.locale : "zh";
   if (!reading || !spread) return NextResponse.json({ error: locale === "en" ? "This reading could not be found. Please complete a reading first." : "没有找到这次占卜，请先完成一次解读。" }, { status: 404 });
 
   const selectedCards = reading.cards.map((selected, index): PromptCard | null => {
@@ -105,6 +90,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: locale === "en" ? "The reading card data is invalid." : "占卜牌面数据无效。" }, { status: 400 });
   }
 
+  const creditCost = 0;
+
   const followupId = randomUUID();
   let persisted = false;
   await supabaseRest("followup_questions", {
@@ -115,7 +102,7 @@ export async function POST(request: NextRequest) {
         reading_id: reading.id,
         question,
         status: "pending",
-        credit_cost: 0,
+        credit_cost: creditCost,
       }),
     })
     .then(() => { persisted = true; })
@@ -159,6 +146,7 @@ export async function POST(request: NextRequest) {
       method: "PATCH",
       body: JSON.stringify({ answer, status: "answered", answered_at: new Date().toISOString() }),
     }).catch(() => undefined);
+    void recordEvent({ clientIdHash: client.clientIdHash, name: "followup_submitted", readingId: reading.id });
     return NextResponse.json({ followup: { id: followupId, question, answer } });
   } catch {
     if (persisted) await supabaseRest(`followup_questions?id=eq.${followupId}`, {

@@ -109,15 +109,20 @@ export function buildReadingPrompt({
   context,
   spread,
   selectedCards,
+  deeper = false,
 }: {
   question?: string;
   context?: string;
   spread: TarotSpread;
   selectedCards: PromptCard[];
   locale?: Locale;
+  deeper?: boolean;
 }) {
   const locale = arguments[0].locale ?? "zh";
   if (locale === "en") {
+    const deeperNote = deeper
+      ? "\n\nThis reader has unlocked a deeper reading. Go past the first layer: name the underlying pattern or wound the spread keeps circling, and what would actually shift it. Be honest when the cards resist a clear answer."
+      : "";
     const cardText = selectedCards.map(({ card, position, orientation }, index) => {
       const reversed = orientation === "reversed";
       return `${index + 1}. Position ID: ${position.id}
@@ -172,9 +177,12 @@ Return only a valid JSON object, with no Markdown code block and no text outside
   "summary": "Final answer plus a concrete reality-based next step, about 70-110 English words"
 }
 
-The cards array must match the input position count and order exactly. realityChecks must contain exactly two items. You may use 2-4 short **bold** phrases, but no headings, lists, or extra fields.`;
+The cards array must match the input position count and order exactly. realityChecks must contain exactly two items. You may use 2-4 short **bold** phrases, but no headings, lists, or extra fields.${deeperNote}`;
   }
 
+  const deeperNoteZh = deeper
+    ? "\n\n这位问牌者已解锁「更深的解读」。请越过第一层：指出现这组牌反复绕行的底层模式或未被言说的伤口，以及什么才有可能真正让它松动。如果牌面其实抗拒一个清晰答案，就诚实地说出来。"
+    : "";
   const cardText = selectedCards.map(({ card, position, orientation }, index) => {
     const reversed = orientation === "reversed";
     return `${index + 1}. 牌位 ID：${position.id}
@@ -247,7 +255,7 @@ ${cardText}
   "summary": "最终总结与一个具体可观察的现实信号，约 80–120 个中文字符"
 }
 
-cards 数组必须与输入牌位数量、顺序完全一致，不得遗漏、重复或改写 positionId。realityChecks 必须恰好两项。正文可使用 2–4 处 **加粗短语**，但不要使用标题、列表或额外字段。`;
+cards 数组必须与输入牌位数量、顺序完全一致，不得遗漏、重复或改写 positionId。realityChecks 必须恰好两项。正文可使用 2–4 处 **加粗短语**，但不要使用标题、列表或额外字段。${deeperNoteZh}`;
 }
 
 export function buildFollowupPrompt({
@@ -315,7 +323,7 @@ Requirements:
     ? recentFollowups.map((item, index) => `${index + 1}. 追问：${item.question}\n回答：${item.answer}`).join("\n\n")
     : "没有历史追问。";
 
-  return `请基于同一次塔罗占卜回答一个付费追问。不要重新抽牌，不要扩展成任意问答。
+  return `请基于同一次塔罗占卜回答一个追问。不要重新抽牌，不要扩展成任意问答。
 
 原始问题：${originalQuestion || "问题被留在心里"}
 补充背景：${context?.trim() || "没有补充背景"}

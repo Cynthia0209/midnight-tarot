@@ -9,7 +9,7 @@ import type { Locale } from "@/lib/locale";
 
 gsap.registerPlugin(useGSAP);
 
-export function ShuffleTable({ muted, onComplete, locale = "zh" }: { muted: boolean; onComplete: () => void; locale?: Locale }) {
+export function ShuffleTable({ muted, onComplete, locale = "zh", fast = false }: { muted: boolean; onComplete: () => void; locale?: Locale; fast?: boolean }) {
   const root = useRef<HTMLDivElement>(null);
   const completed = useRef(false);
 
@@ -29,10 +29,11 @@ export function ShuffleTable({ muted, onComplete, locale = "zh" }: { muted: bool
       onComplete: () => {
         if (!completed.current) {
           completed.current = true;
-          window.setTimeout(onComplete, 500);
+          window.setTimeout(onComplete, fast ? 400 : 600);
         }
       },
     });
+    if (fast) timeline.timeScale(1.4);
     timeline
       .fromTo(cards, { opacity: 0, y: -70, rotation: (index) => index * 3 - 12 }, { opacity: 1, y: 0, rotation: 0, duration: .8, stagger: .045, ease: "power3.out" })
       .to(cards.filter((_, index) => index % 2 === 0), { x: -115, rotation: -7, duration: .55, ease: "power2.inOut" })
@@ -51,8 +52,8 @@ export function ShuffleTable({ muted, onComplete, locale = "zh" }: { muted: bool
         </div>
       ))}
       <div className="absolute bottom-3 text-center">
-        <p className="font-display text-xs uppercase tracking-[.42em] text-antiqueGold/70">The deck remembers</p>
-        <p className="mt-3 font-zhSerif text-sm tracking-[.2em] text-moon/50">{locale === "en" ? "The deck order is settling for this question" : "牌序正在为这一次提问固定下来"}</p>
+        <p className="font-display text-xs uppercase tracking-[.42em] text-antiqueGold/70">{locale === "en" ? "The deck remembers" : "牌，都记得"}</p>
+        <p className="mt-3 font-zhSerif text-sm tracking-[.2em] text-moon/55">{locale === "en" ? "The deck order is settling for this question" : "牌序正在为这一次提问固定下来"}</p>
       </div>
     </div>
   );

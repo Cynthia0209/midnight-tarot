@@ -1,6 +1,7 @@
 "use client";
 
 const ANONYMOUS_STORAGE_KEY = "midnight-tarot-anonymous-client-v1";
+let memoryAnonymousClient: AnonymousClientSession | undefined;
 
 export type AnonymousClientSession = {
   clientId: string;
@@ -21,11 +22,15 @@ export function loadAnonymousClient(): AnonymousClientSession {
   if (typeof window === "undefined") {
     return { clientId: "server", clientSecret: "server-secret-placeholder-value", createdAt: new Date().toISOString() };
   }
+  if (memoryAnonymousClient) return memoryAnonymousClient;
   try {
     const value = window.localStorage.getItem(ANONYMOUS_STORAGE_KEY);
     if (value) {
       const parsed = JSON.parse(value) as AnonymousClientSession;
-      if (parsed.clientId && parsed.clientSecret) return parsed;
+      if (parsed.clientId && parsed.clientSecret) {
+        memoryAnonymousClient = parsed;
+        return parsed;
+      }
     }
   } catch {
     // fall through and create a fresh anonymous client.
@@ -35,7 +40,12 @@ export function loadAnonymousClient(): AnonymousClientSession {
     clientSecret: randomToken(42),
     createdAt: new Date().toISOString(),
   };
-  window.localStorage.setItem(ANONYMOUS_STORAGE_KEY, JSON.stringify(next));
+  memoryAnonymousClient = next;
+  try {
+    window.localStorage.setItem(ANONYMOUS_STORAGE_KEY, JSON.stringify(next));
+  } catch {
+    // Keep a stable identity for this tab when persistent storage is unavailable.
+  }
   return next;
 }
 

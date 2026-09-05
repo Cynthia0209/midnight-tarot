@@ -13,6 +13,8 @@ import {
 import { getDeepSeekModel, getOpenAI } from "@/lib/openai";
 import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 import { isLocale, type Locale } from "@/lib/locale";
+import { getAnonymousClient } from "@/lib/supabaseServer";
+import { recordEvent } from "@/lib/events";
 
 export const runtime = "nodejs";
 
@@ -134,21 +136,26 @@ function getAnonymousUserId(request: NextRequest) {
   return createHash("sha256").update(rawIp).digest("base64url").slice(0, 32);
 }
 
+/** Prefer the device identity; fall back to the coarse IP hash. */
+function eventIdentity(request: NextRequest) {
+  return getAnonymousClient(request)?.clientIdHash ?? getAnonymousUserId(request);
+}
+
 export async function POST(request: NextRequest) {
   const startedAt = Date.now();
-  const limit = checkRateLimit(`reading:${getClientIp(request)}`, 12, 60_000);
-  if (!limit.ok) {
-    return NextResponse.json({ error: "请求有点太密集了，请稍后再试。" }, { status: 429 });
-  }
   let body: RequestBody;
   try {
     body = await request.json() as RequestBody;
   } catch {
-    return NextResponse.json({ error: "请求格式无效。" }, { status: 400 });
+    return NextResponse.json({ error: "The request format is invalid." }, { status: 400 });
+  }
+  const locale: Locale = isLocale(body.locale) ? body.locale : "zh";
+  const limit = checkRateLimit(`reading:${getClientIp(request)}`, 12, 60_000);
+  if (!limit.ok) {
+    return NextResponse.json({ error: locale === "en" ? "Requests are coming a little too quickly. Please try again in a moment." : "请求有点太密集了，请稍后再试。" }, { status: 429 });
   }
 
   const spread = body.spreadId ? spreadById.get(body.spreadId) : undefined;
-  const locale: Locale = isLocale(body.locale) ? body.locale : "zh";
   if (!spread || !Array.isArray(body.cards) || body.cards.length !== spread.positions.length) {
     return NextResponse.json({ error: locale === "en" ? "The spread or card count is invalid." : "牌阵或牌数无效。" }, { status: 400 });
   }
@@ -189,11 +196,13 @@ export async function POST(request: NextRequest) {
 
   if (!process.env.DEEPSEEK_API_KEY) {
     logReadingFallback("missing_deepseek_api_key");
+    void recordEvent({ clientIdHash: eventIdentity(request), name: "reading_completed", props: { fallback: true } });
     return readingResponse({ reading: fallback, fallback: true }, {}, { totalMs: Date.now() - startedAt });
   }
 
   try {
-    const maxTokens = Math.min(5000, 1800 + cards.length * 320);
+    const deeper = true;
+    const maxTokens = Math.min(5000, (deeper ? 2600 : 1800) + cards.length * (deeper ? 420 : 320));
     const timeoutMs = Number(process.env.DEEPSEEK_TIMEOUT_MS ?? Math.min(45000, 24000 + cards.length * 1800));
     const upstreamStartedAt = Date.now();
     const completion = await getOpenAI().chat.completions.create({
@@ -208,6 +217,7 @@ export async function POST(request: NextRequest) {
             spread,
             selectedCards: cards,
             locale,
+            deeper,
           }),
         },
       ],
@@ -258,6 +268,7 @@ export async function POST(request: NextRequest) {
     } else if (!valid.reading && repairedValid.reading) {
       console.warn("[reading:repaired]", valid.reason ?? "validation_failed");
     }
+    void recordEvent({ clientIdHash: eventIdentity(request), name: "reading_completed", props: { fallback: !reading } });
     return readingResponse(
       {
         reading: personalizeReadingContent(reading ?? fallback),
@@ -268,6 +279,7 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     logReadingFallback("deepseek_request_failed", error instanceof Error ? error.message : error);
+    void recordEvent({ clientIdHash: eventIdentity(request), name: "reading_completed", props: { fallback: true } });
     return readingResponse(
       { reading: fallback, fallback: true },
       {},

@@ -49,18 +49,18 @@ export function SpreadBoard({
                   revealed={index < revealCount}
                   selected
                   disabled
-                  compact={spread.positions.length >= 5}
+                  compact
                   flipId={`card-${item.cardId}`}
                   locale={locale}
                 />
               ) : (
-                <div className={`${spread.positions.length >= 5 ? "w-[78px] sm:w-[92px] md:w-[108px]" : "w-[112px] sm:w-[126px] md:w-[142px]"} aspect-[.57] rounded-[12px] border border-dashed border-antiqueGold/25 bg-white/[.015]`} />
+                <div className="aspect-[.57] w-[78px] rounded-[12px] border border-dashed border-antiqueGold/25 bg-white/[.015] sm:w-[92px] md:w-[108px]" />
               )}
             </div>
             <div className="spread-slot-label mt-2 w-28 text-center">
               <p className="font-zhSerif text-[11px] tracking-[.08em] text-antiqueGold/85">{locale === "en" ? position.title : position.titleZh}</p>
               {showMeanings && index < revealCount && card && (
-                <p className="mt-1 hidden text-[9px] leading-4 text-moon/45 sm:block">
+                <p className="mt-1 hidden text-[9px] leading-4 text-moon/60 sm:block">
                   {item.orientation === "reversed"
                     ? (locale === "en" ? card.reversedKeywordsEn : card.reversedKeywords).slice(0, 2).join(" · ")
                     : (locale === "en" ? card.uprightKeywordsEn : card.uprightKeywords).slice(0, 2).join(" · ")}

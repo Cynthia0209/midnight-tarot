@@ -63,17 +63,13 @@ export const TarotCardView = forwardRef<HTMLButtonElement, Props>(function Tarot
       )}
     >
       <span className="card-3d absolute inset-0">
-        <span className="card-face card-cover absolute inset-0 overflow-hidden rounded-[inherit] border border-antiqueGold/45 bg-[#10091a] shadow-[0_18px_40px_rgba(0,0,0,.55)]">
-          <span className="absolute inset-[7px] rounded-[9px] border border-antiqueGold/25" />
-          <span className="absolute inset-[13px] rounded-[7px] border border-lavender/15" />
-          <span className="card-back-stars absolute inset-0 opacity-75" />
-          <span className="absolute left-1/2 top-1/2 h-[43%] w-[58%] -translate-x-1/2 -translate-y-1/2 rounded-[50%] border border-antiqueGold/35" />
-          <span className="absolute left-1/2 top-1/2 h-[28%] w-[38%] -translate-x-1/2 -translate-y-1/2 rotate-45 border border-antiqueGold/40" />
-          <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xl text-antiqueGold drop-shadow-[0_0_12px_rgba(216,191,136,.7)]">☾</span>
-          <span className="absolute inset-x-0 bottom-[9%] text-center font-display text-[8px] tracking-[.32em] text-antiqueGold/65">MIDNIGHT</span>
+        <span className="card-face card-cover absolute inset-0 overflow-hidden rounded-[inherit] bg-[#10091a] shadow-[0_18px_40px_rgba(0,0,0,.55)]">
+          <Image src="/card-back.png" alt="" fill sizes="(max-width: 640px) 112px, 142px" className="object-fill" priority={selected} />
+          <span className="card-cover-sheen absolute inset-0" />
         </span>
 
         <span
+          aria-hidden={!revealed}
           className="card-face card-art absolute inset-0 overflow-hidden rounded-[inherit] border border-antiqueGold/60 bg-[#e5d8bf] shadow-[0_18px_45px_rgba(0,0,0,.62)]"
           style={{ "--card-orientation": orientation === "reversed" ? "180deg" : "0deg" } as CSSProperties}
         >
@@ -82,7 +78,7 @@ export const TarotCardView = forwardRef<HTMLButtonElement, Props>(function Tarot
               <span className="absolute inset-0 flex flex-col items-center justify-center bg-[radial-gradient(circle_at_50%_35%,#3b2149,#17101d_72%)] p-3 text-center">
                 <span className="text-2xl text-antiqueGold/75">✦</span>
                 <span className="mt-3 font-zhSerif text-sm tracking-[.12em] text-moon/85">{locale === "en" ? card.name : card.nameZh}</span>
-                <span className="mt-1 font-display text-[8px] uppercase tracking-[.12em] text-antiqueGold/55">{card.name}</span>
+                <span className="mt-1 font-display text-[8px] uppercase tracking-[.12em] text-antiqueGold/62">{card.name}</span>
               </span>
               {revealed && (
                 <Image
