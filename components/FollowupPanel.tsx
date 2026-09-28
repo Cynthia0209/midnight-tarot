@@ -57,12 +57,12 @@ export function FollowupPanel({ savedReading, locale = "zh" }: { savedReading?: 
         body: JSON.stringify(reading),
       });
       if (!response.ok && activeReadingIdRef.current === reading.id) {
-        setSyncMessage(locale === "en" ? "Cloud follow-up history is temporarily unavailable. Please reconnect before asking a follow-up." : "云端追问记录暂时不可用，请恢复连接后再追问。");
+        setSyncMessage(locale === "en" ? "Cloud history is temporarily unavailable, but you can still continue this reading." : "云端追问记录暂时不可用，但你仍然可以继续这次解读。");
       }
       return response.ok;
     } catch {
       if (activeReadingIdRef.current === reading.id) {
-        setSyncMessage(locale === "en" ? "Cloud follow-up history is temporarily unavailable. Please reconnect before asking a follow-up." : "云端追问记录暂时不可用，请恢复连接后再追问。");
+        setSyncMessage(locale === "en" ? "Cloud history is temporarily unavailable, but you can still continue this reading." : "云端追问记录暂时不可用，但你仍然可以继续这次解读。");
       }
       return false;
     }
@@ -85,15 +85,12 @@ export function FollowupPanel({ savedReading, locale = "zh" }: { savedReading?: 
     setFollowupError("");
     try {
       const initiallySynced = await syncPromiseRef.current;
-      const synced = initiallySynced || await syncReading(savedReading);
-      if (!synced) {
-        throw new Error(locale === "en" ? "Reconnect before submitting this follow-up." : "请恢复连接后再提交追问。");
-      }
+      if (!initiallySynced) void syncReading(savedReading);
       const response = await anonymousFetch("/api/followups", {
         method: "POST",
         body: JSON.stringify({ readingId: savedReading.id, question: question.trim(), reading: savedReading }),
       });
-      const data = await response.json() as { followup?: Followup; error?: string };
+      const data = await response.json().catch(() => ({})) as { followup?: Followup; error?: string };
       if (!response.ok || !data.followup) {
         throw new Error(data.error ?? (locale === "en" ? "Follow-up failed." : "追问失败。"));
       }

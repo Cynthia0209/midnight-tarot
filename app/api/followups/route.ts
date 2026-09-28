@@ -6,6 +6,7 @@ import { buildFollowupPrompt, getSystemPrompt, type PromptCard } from "@/lib/pro
 import { getDeepSeekModel, getOpenAI } from "@/lib/openai";
 import { getAnonymousClient, supabaseRest } from "@/lib/supabaseServer";
 import {
+  isStructuredReading,
   personalizeReadingText,
   readingToPlainText,
   type ReadingContent,
@@ -42,6 +43,39 @@ type FollowupBody = {
   reading?: SavedReading;
 };
 
+function readingFromRequest(body: FollowupBody | null, clientIdHash: string): ReadingRow | null {
+  const submitted = body?.reading;
+  if (!submitted || submitted.id !== body?.readingId) return null;
+  const spread = spreadById.get(submitted.spreadId);
+  if (!spread || !Array.isArray(submitted.cards) || submitted.cards.length !== spread.positions.length) return null;
+  if (typeof submitted.question !== "string" || submitted.question.length > 240) return null;
+  if (submitted.context !== undefined && (typeof submitted.context !== "string" || submitted.context.length > 500)) return null;
+  if (!(typeof submitted.reading === "string" || isStructuredReading(submitted.reading))) return null;
+  if (JSON.stringify(submitted.reading).length > 40_000) return null;
+
+  const seen = new Set<number>();
+  const cardsValid = submitted.cards.every((selected, index) => {
+    const expectedPosition = spread.positions[index];
+    if (!expectedPosition || selected.positionId !== expectedPosition.id) return false;
+    if (!tarotCardById.has(selected.cardId) || !["upright", "reversed"].includes(selected.orientation)) return false;
+    if (seen.has(selected.cardId)) return false;
+    seen.add(selected.cardId);
+    return true;
+  });
+  if (!cardsValid) return null;
+
+  return {
+    id: submitted.id,
+    client_id_hash: clientIdHash,
+    spread_id: submitted.spreadId,
+    question: submitted.question,
+    context: submitted.context?.trim() || null,
+    cards: submitted.cards,
+    reading: submitted.reading,
+    locale: isLocale(submitted.locale) ? submitted.locale : "zh",
+  };
+}
+
 export async function GET(request: NextRequest) {
   const locale: Locale = isLocale(request.nextUrl.searchParams.get("locale")) ? (request.nextUrl.searchParams.get("locale") as Locale) : "zh";
   const client = getAnonymousClient(request);
@@ -74,10 +108,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: locale === "en" ? "The follow-up is invalid. Keep it under 240 characters." : "追问内容无效，最多 240 字。" }, { status: 400 });
   }
 
-  const readingRows = await supabaseRest<ReadingRow[]>(
-    `reading_sessions?id=eq.${readingId}&client_id_hash=eq.${client.clientIdHash}&select=id,client_id_hash,spread_id,question,context,cards,reading`,
-  ).catch(() => []);
-  const reading = readingRows[0];
+  let readingRows: ReadingRow[] = [];
+  try {
+    readingRows = await supabaseRest<ReadingRow[]>(
+      `reading_sessions?id=eq.${readingId}&client_id_hash=eq.${client.clientIdHash}&select=id,client_id_hash,spread_id,question,context,cards,reading`,
+    );
+  } catch (error) {
+    console.error("[followup:reading_lookup_failed]", error instanceof Error ? error.message : error);
+  }
+  const reading = readingRows[0] ?? readingFromRequest(body, client.clientIdHash);
   const spread = reading ? spreadById.get(reading.spread_id) : undefined;
   if (!reading || !spread) return NextResponse.json({ error: locale === "en" ? "This reading could not be found. Please complete a reading first." : "没有找到这次占卜，请先完成一次解读。" }, { status: 404 });
 
@@ -148,7 +187,8 @@ export async function POST(request: NextRequest) {
     }).catch(() => undefined);
     void recordEvent({ clientIdHash: client.clientIdHash, name: "followup_submitted", readingId: reading.id });
     return NextResponse.json({ followup: { id: followupId, question, answer } });
-  } catch {
+  } catch (error) {
+    console.error("[followup:generation_failed]", error instanceof Error ? error.message : error);
     if (persisted) await supabaseRest(`followup_questions?id=eq.${followupId}`, {
       method: "PATCH",
       body: JSON.stringify({ status: "failed" }),
